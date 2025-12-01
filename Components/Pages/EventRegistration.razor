@@ -3,6 +3,8 @@
 @using EventEase.Services
 @using System.Linq
 @inject EventService EventService
+@inject UserSessionService UserSession
+@inject RegistrationService RegistrationService
 @inject NavigationManager Navigation
 
 <PageTitle>Event Registration</PageTitle>
@@ -38,6 +40,13 @@
                     <h3>Registration Successful!</h3>
                     <p>Thank you for registering, <strong>@registrationData.FullName</strong>!</p>
                     <p>A confirmation email has been sent to <strong>@registrationData.Email</strong></p>
+                    @if (!string.IsNullOrEmpty(confirmationCode))
+                    {
+                        <div class="confirmation-code">
+                            <p><strong>Confirmation Code:</strong></p>
+                            <code>@confirmationCode</code>
+                        </div>
+                    }
                     <div class="success-actions">
                         <button class="btn-primary" @onclick="NavigateToEvents">Browse More Events</button>
                         <button class="btn-secondary" @onclick="NavigateToDetails">View Event Details</button>
@@ -139,12 +148,22 @@
     private bool isLoading = true;
     private bool isRegistered = false;
     private string errorMessage = string.Empty;
+    private string confirmationCode = string.Empty;
 
     private RegistrationData registrationData = new();
 
     protected override async Task OnInitializedAsync()
     {
         await LoadEventDetails();
+        
+        // Pre-fill form if user is logged in
+        var currentUser = UserSession.GetCurrentUser();
+        if (currentUser != null)
+        {
+            registrationData.FullName = currentUser.FullName;
+            registrationData.Email = currentUser.Email;
+            registrationData.PhoneNumber = currentUser.PhoneNumber;
+        }
     }
 
     private async Task LoadEventDetails()
@@ -192,7 +211,7 @@
         return cleanedNumber.All(char.IsDigit) && cleanedNumber.Length >= 7 && cleanedNumber.Length <= 15;
     }
 
-    private void SubmitRegistration()
+    private async Task SubmitRegistration()
     {
         if (!IsFormValid())
         {
@@ -200,9 +219,46 @@
             return;
         }
 
-        // Simulate registration process
-        isRegistered = true;
-        errorMessage = string.Empty;
+        try
+        {
+            var currentUser = UserSession.GetCurrentUser();
+            var userId = currentUser?.Id ?? 0;
+
+            var registration = new Registration
+            {
+                EventId = EventId,
+                UserId = userId,
+                FullName = registrationData.FullName,
+                Email = registrationData.Email,
+                PhoneNumber = registrationData.PhoneNumber,
+                NumberOfTickets = registrationData.NumberOfTickets,
+                SpecialRequests = registrationData.SpecialRequests
+            };
+
+            var result = await RegistrationService.CreateRegistrationAsync(registration);
+
+            if (result != null)
+            {
+                confirmationCode = result.ConfirmationCode;
+                
+                // Add to user's registered events if logged in
+                if (currentUser != null)
+                {
+                    UserSession.AddRegistration(EventId);
+                }
+
+                isRegistered = true;
+                errorMessage = string.Empty;
+            }
+            else
+            {
+                errorMessage = "You have already registered for this event.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Registration failed: {ex.Message}";
+        }
     }
 
     private void NavigateToEvents()
@@ -384,6 +440,23 @@
     .success-message p {
         color: #666;
         margin-bottom: 10px;
+    }
+
+    .confirmation-code {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 20px 0;
+        border: 2px dashed #28a745;
+    }
+
+    .confirmation-code code {
+        display: block;
+        font-size: 1.5rem;
+        color: #28a745;
+        font-weight: bold;
+        letter-spacing: 2px;
+        margin-top: 8px;
     }
 
     .success-actions {

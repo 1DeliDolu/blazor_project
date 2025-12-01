@@ -1,0 +1,494 @@
+@page "/profile"
+@using EventEase.Models
+@using EventEase.Services
+@inject UserSessionService UserSession
+@inject EventService EventService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>My Profile - EventEase</PageTitle>
+
+@if (currentUser == null)
+{
+    <div class="auth-prompt">
+        <div class="auth-card">
+            <h2>🔒 Authentication Required</h2>
+            <p>Please login to view your profile</p>
+            <a href="/login?returnUrl=/profile" class="btn btn-primary">Login</a>
+            <p class="register-link">Don't have an account? <a href="/register">Register here</a></p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="profile-container">
+        <div class="profile-header">
+            <div class="profile-avatar">
+                @GetInitials(currentUser.FirstName, currentUser.LastName)
+            </div>
+            <div class="profile-info">
+                <h1>@currentUser.FullName</h1>
+                <p class="profile-email">@currentUser.Email</p>
+                <p class="profile-joined">Member since @currentUser.CreatedAt.ToString("MMMM yyyy")</p>
+            </div>
+            <button @onclick="HandleLogout" class="btn btn-logout">Logout</button>
+        </div>
+
+        <div class="profile-content">
+            <div class="profile-section">
+                <h2>📋 Personal Information</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">First Name:</span>
+                        <span class="info-value">@currentUser.FirstName</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Last Name:</span>
+                        <span class="info-value">@currentUser.LastName</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Email:</span>
+                        <span class="info-value">@currentUser.Email</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Phone:</span>
+                        <span class="info-value">@currentUser.PhoneNumber</span>
+                    </div>
+                </div>
+                <button class="btn btn-secondary" disabled>Edit Profile (Coming Soon)</button>
+            </div>
+
+            <div class="profile-section">
+                <h2>⚙️ Preferences</h2>
+                <div class="preferences-grid">
+                    <div class="preference-item">
+                        <span class="pref-label">📧 Email Notifications:</span>
+                        <span class="pref-value">@(currentUser.Preferences.EmailNotifications ? "Enabled" : "Disabled")</span>
+                    </div>
+                    <div class="preference-item">
+                        <span class="pref-label">📱 SMS Notifications:</span>
+                        <span class="pref-value">@(currentUser.Preferences.SmsNotifications ? "Enabled" : "Disabled")</span>
+                    </div>
+                    <div class="preference-item">
+                        <span class="pref-label">🎨 Theme:</span>
+                        <span class="pref-value">@currentUser.Preferences.Theme</span>
+                    </div>
+                    <div class="preference-item">
+                        <span class="pref-label">🌍 Language:</span>
+                        <span class="pref-value">@currentUser.Preferences.Language</span>
+                    </div>
+                </div>
+                @if (currentUser.Preferences.PreferredCategories.Any())
+                {
+                    <div class="preferred-categories">
+                        <p class="pref-label">Preferred Categories:</p>
+                        <div class="categories-tags">
+                            @foreach (var category in currentUser.Preferences.PreferredCategories)
+                            {
+                                <span class="category-tag">@category</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="profile-section">
+                <h2>❤️ Favorite Events (@favoriteEvents.Count)</h2>
+                @if (favoriteEvents.Any())
+                {
+                    <div class="events-grid">
+                        @foreach (var eventItem in favoriteEvents)
+                        {
+                            <div class="event-card" @onclick='() => Navigation.NavigateTo($"/events/{eventItem.Id}")'>
+                                <h3>@eventItem.Name</h3>
+                                <p class="event-date">📅 @eventItem.Date.ToString("MMM dd, yyyy")</p>
+                                <p class="event-location">📍 @eventItem.Location</p>
+                                <span class="event-category">@eventItem.Category</span>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="empty-state">
+                        <p>No favorite events yet</p>
+                        <a href="/events" class="btn btn-primary">Browse Events</a>
+                    </div>
+                }
+            </div>
+
+            <div class="profile-section">
+                <h2>🎫 Registered Events (@registeredEvents.Count)</h2>
+                @if (registeredEvents.Any())
+                {
+                    <div class="events-grid">
+                        @foreach (var eventItem in registeredEvents)
+                        {
+                            <div class="event-card registered" @onclick='() => Navigation.NavigateTo($"/events/{eventItem.Id}")'>
+                                <h3>@eventItem.Name</h3>
+                                <p class="event-date">📅 @eventItem.Date.ToString("MMM dd, yyyy")</p>
+                                <p class="event-location">📍 @eventItem.Location</p>
+                                <span class="event-category">@eventItem.Category</span>
+                                <span class="registered-badge">✅ Registered</span>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="empty-state">
+                        <p>No registered events yet</p>
+                        <a href="/events" class="btn btn-primary">Browse Events</a>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private User? currentUser;
+    private List<Event> favoriteEvents = new();
+    private List<Event> registeredEvents = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        UserSession.OnChange += StateHasChanged;
+        await LoadUserData();
+    }
+
+    private async Task LoadUserData()
+    {
+        currentUser = UserSession.GetCurrentUser();
+        
+        if (currentUser != null)
+        {
+            var allEvents = await EventService.GetAllEventsAsync();
+            
+            favoriteEvents = allEvents
+                .Where(e => currentUser.FavoriteEventIds.Contains(e.Id))
+                .ToList();
+            
+            registeredEvents = allEvents
+                .Where(e => currentUser.RegisteredEventIds.Contains(e.Id))
+                .ToList();
+        }
+    }
+
+    private string GetInitials(string firstName, string lastName)
+    {
+        var firstInitial = !string.IsNullOrEmpty(firstName) ? firstName[0].ToString().ToUpper() : "";
+        var lastInitial = !string.IsNullOrEmpty(lastName) ? lastName[0].ToString().ToUpper() : "";
+        return firstInitial + lastInitial;
+    }
+
+    private void HandleLogout()
+    {
+        UserSession.Logout();
+        Navigation.NavigateTo("/");
+    }
+
+    public void Dispose()
+    {
+        UserSession.OnChange -= StateHasChanged;
+    }
+}
+
+<style>
+    .auth-prompt {
+        min-height: 60vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .auth-card {
+        text-align: center;
+        padding: 40px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        max-width: 400px;
+    }
+
+    .auth-card h2 {
+        margin-bottom: 15px;
+        color: #333;
+    }
+
+    .auth-card p {
+        margin-bottom: 20px;
+        color: #666;
+    }
+
+    .register-link {
+        margin-top: 15px;
+        font-size: 14px;
+    }
+
+    .register-link a {
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .profile-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .profile-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 40px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        gap: 30px;
+        margin-bottom: 30px;
+        position: relative;
+    }
+
+    .profile-avatar {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 36px;
+        font-weight: bold;
+        border: 3px solid white;
+    }
+
+    .profile-info h1 {
+        margin: 0 0 8px 0;
+        font-size: 32px;
+    }
+
+    .profile-email {
+        margin: 5px 0;
+        opacity: 0.9;
+    }
+
+    .profile-joined {
+        margin: 5px 0;
+        opacity: 0.7;
+        font-size: 14px;
+    }
+
+    .btn-logout {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: 2px solid white;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .btn-logout:hover {
+        background: white;
+        color: #667eea;
+    }
+
+    .profile-content {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+    }
+
+    .profile-section {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .profile-section h2 {
+        margin: 0 0 20px 0;
+        color: #333;
+        font-size: 24px;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .info-label {
+        color: #666;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .info-value {
+        color: #333;
+        font-size: 16px;
+    }
+
+    .preferences-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .preference-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+
+    .pref-label {
+        color: #666;
+        font-size: 14px;
+    }
+
+    .pref-value {
+        color: #333;
+        font-weight: 600;
+    }
+
+    .preferred-categories {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .categories-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .category-tag {
+        background: #667eea;
+        color: white;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .events-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+    }
+
+    .event-card {
+        background: white;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 20px;
+        cursor: pointer;
+        transition: all 0.3s;
+        position: relative;
+    }
+
+    .event-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        border-color: #667eea;
+    }
+
+    .event-card.registered {
+        border-color: #28a745;
+        background: #f0fff4;
+    }
+
+    .event-card h3 {
+        margin: 0 0 12px 0;
+        color: #333;
+        font-size: 18px;
+    }
+
+    .event-date, .event-location {
+        margin: 6px 0;
+        color: #666;
+        font-size: 14px;
+    }
+
+    .event-category {
+        display: inline-block;
+        background: #667eea;
+        color: white;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-top: 10px;
+    }
+
+    .registered-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: #28a745;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #666;
+    }
+
+    .empty-state p {
+        margin-bottom: 20px;
+        font-size: 16px;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        text-decoration: none;
+        display: inline-block;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+    .btn-secondary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+</style>

@@ -2,12 +2,20 @@
 @using EventEase.Models
 @using EventEase.Services
 @inject EventService EventService
+@inject UserSessionService UserSession
 @inject NavigationManager Navigation
+@implements IDisposable
 
 <PageTitle>Events</PageTitle>
 
 <div class="events-container">
-    <h1>EventEase - Browse Events</h1>
+    <div class="page-header">
+        <h1>🎉 Browse Events</h1>
+        @if (UserSession.IsUserLoggedIn())
+        {
+            <p class="welcome-text">Welcome back, <strong>@UserSession.GetCurrentUser()?.FirstName</strong>!</p>
+        }
+    </div>
     
     @if (hasError)
     {
@@ -37,12 +45,31 @@
             <div class="events-grid">
                 @foreach (var eventItem in displayedEvents)
                 {
-                    <EventCard 
-                        @key="eventItem.Id"
-                        EventName="@eventItem.Name"
-                        EventDate="@eventItem.Date"
-                        Location="@eventItem.Location"
-                        OnViewDetails="@(() => ViewEventDetails(eventItem.Id))" />
+                    <div class="event-card-wrapper" @key="eventItem.Id">
+                        <div class="event-card" @onclick="() => ViewEventDetails(eventItem.Id)">
+                            <div class="event-header">
+                                <h3>@eventItem.Name</h3>
+                                @if (UserSession.IsUserLoggedIn())
+                                {
+                                    <button class="favorite-btn @(UserSession.IsFavorite(eventItem.Id) ? "active" : "")"
+                                            @onclick:stopPropagation="true"
+                                            @onclick="() => ToggleFavorite(eventItem.Id)">
+                                        @(UserSession.IsFavorite(eventItem.Id) ? "❤️" : "🤍")
+                                    </button>
+                                }
+                            </div>
+                            <p class="event-date">📅 @eventItem.Date.ToString("MMMM dd, yyyy")</p>
+                            <p class="event-location">📍 @eventItem.Location</p>
+                            <p class="event-description">@eventItem.Description</p>
+                            <div class="event-footer">
+                                <span class="event-category">@eventItem.Category</span>
+                                @if (UserSession.IsRegistered(eventItem.Id))
+                                {
+                                    <span class="registered-badge">✅ Registered</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
                 }
             </div>
         }
@@ -63,6 +90,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        UserSession.OnChange += StateHasChanged;
         await LoadEvents();
     }
 
@@ -113,6 +141,29 @@
     {
         Navigation.NavigateTo($"/event/{eventId}");
     }
+
+    private void ToggleFavorite(int eventId)
+    {
+        if (!UserSession.IsUserLoggedIn())
+        {
+            Navigation.NavigateTo($"/login?returnUrl=/events");
+            return;
+        }
+
+        if (UserSession.IsFavorite(eventId))
+        {
+            UserSession.RemoveFromFavorites(eventId);
+        }
+        else
+        {
+            UserSession.AddToFavorites(eventId);
+        }
+    }
+
+    public void Dispose()
+    {
+        UserSession.OnChange -= StateHasChanged;
+    }
 }
 
 <style>
@@ -122,10 +173,19 @@
         margin: 0 auto;
     }
 
-    .events-container h1 {
+    .page-header {
         text-align: center;
-        color: #007bff;
         margin-bottom: 30px;
+    }
+
+    .page-header h1 {
+        color: #333;
+        margin-bottom: 10px;
+    }
+
+    .welcome-text {
+        color: #666;
+        font-size: 16px;
     }
 
     .filter-section {
@@ -140,15 +200,118 @@
 
     .filter-section select {
         padding: 8px 15px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
+        border: 2px solid #ddd;
+        border-radius: 6px;
         font-size: 1rem;
+        transition: border-color 0.3s;
+    }
+
+    .filter-section select:focus {
+        outline: none;
+        border-color: #667eea;
     }
 
     .events-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 20px;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 24px;
+    }
+
+    .event-card {
+        background: white;
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 24px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .event-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        border-color: #667eea;
+    }
+
+    .event-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 12px;
+    }
+
+    .event-header h3 {
+        margin: 0;
+        color: #333;
+        font-size: 20px;
+        flex: 1;
+    }
+
+    .favorite-btn {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        padding: 0;
+        margin-left: 12px;
+        transition: transform 0.2s;
+    }
+
+    .favorite-btn:hover {
+        transform: scale(1.2);
+    }
+
+    .favorite-btn.active {
+        animation: heartbeat 0.3s ease;
+    }
+
+    @@keyframes heartbeat {
+        0%, 100% { transform: scale(1); }
+        25% { transform: scale(1.3); }
+        50% { transform: scale(1.1); }
+    }
+
+    .event-date, .event-location {
+        margin: 8px 0;
+        color: #666;
+        font-size: 14px;
+    }
+
+    .event-description {
+        margin: 12px 0;
+        color: #555;
+        font-size: 14px;
+        line-height: 1.5;
+        flex: 1;
+    }
+
+    .event-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .event-category {
+        background: #667eea;
+        color: white;
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .registered-badge {
+        background: #28a745;
+        color: white;
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 12px;
+        font-weight: 600;
     }
 
     .no-events {

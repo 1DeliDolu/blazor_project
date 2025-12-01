@@ -1,0 +1,360 @@
+@page "/register"
+@rendermode InteractiveServer
+@using EventEase.Models
+@using EventEase.Services
+@inject UserSessionService UserSession
+@inject NavigationManager Navigation
+
+<PageTitle>Register - EventEase</PageTitle>
+
+<div class="register-container">
+    <div class="register-card">
+        <h2>Create Account</h2>
+        <p class="subtitle">Join EventEase to manage your events</p>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">
+                @errorMessage
+            </div>
+        }
+
+            <EditForm Model="registerModel" OnValidSubmit="HandleRegister" FormName="registerForm" class="register-form">
+                <DataAnnotationsValidator />            <div class="form-row">
+                <div class="form-group">
+                    <label for="firstName">First Name</label>
+                    <InputText id="firstName" 
+                              @bind-Value="registerModel.FirstName" 
+                              class="form-control" 
+                              placeholder="John" />
+                    <ValidationMessage For="@(() => registerModel.FirstName)" />
+                </div>
+
+                <div class="form-group">
+                    <label for="lastName">Last Name</label>
+                    <InputText id="lastName" 
+                              @bind-Value="registerModel.LastName" 
+                              class="form-control" 
+                              placeholder="Doe" />
+                    <ValidationMessage For="@(() => registerModel.LastName)" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email</label>
+                <InputText id="email" 
+                          @bind-Value="registerModel.Email" 
+                          @bind-Value:event="oninput"
+                          class="form-control" 
+                          placeholder="john.doe@example.com" />
+                @if (!string.IsNullOrWhiteSpace(registerModel.Email) && !IsValidEmail(registerModel.Email))
+                {
+                    <span class="validation-feedback error">❌ Invalid email format</span>
+                }
+                else if (!string.IsNullOrWhiteSpace(registerModel.Email))
+                {
+                    <span class="validation-feedback success">✅ Valid email</span>
+                }
+                <ValidationMessage For="@(() => registerModel.Email)" />
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Phone Number</label>
+                <InputText id="phone" 
+                          @bind-Value="registerModel.PhoneNumber" 
+                          @bind-Value:event="oninput"
+                          class="form-control" 
+                          placeholder="1234567890" />
+                @if (!string.IsNullOrWhiteSpace(registerModel.PhoneNumber) && !IsValidPhoneNumber(registerModel.PhoneNumber))
+                {
+                    <span class="validation-feedback error">❌ Phone must be 7-15 digits</span>
+                }
+                else if (!string.IsNullOrWhiteSpace(registerModel.PhoneNumber))
+                {
+                    <span class="validation-feedback success">✅ Valid phone number</span>
+                }
+                <ValidationMessage For="@(() => registerModel.PhoneNumber)" />
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <InputText id="password" 
+                          type="password" 
+                          @bind-Value="registerModel.Password" 
+                          class="form-control" 
+                          placeholder="••••••••" />
+                <ValidationMessage For="@(() => registerModel.Password)" />
+            </div>
+
+            <div class="form-group">
+                <label for="confirmPassword">Confirm Password</label>
+                <InputText id="confirmPassword" 
+                          type="password" 
+                          @bind-Value="registerModel.ConfirmPassword" 
+                          class="form-control" 
+                          placeholder="••••••••" />
+                @if (!string.IsNullOrWhiteSpace(registerModel.ConfirmPassword) && 
+                     registerModel.Password != registerModel.ConfirmPassword)
+                {
+                    <span class="validation-feedback error">❌ Passwords do not match</span>
+                }
+                <ValidationMessage For="@(() => registerModel.ConfirmPassword)" />
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <span>Creating Account...</span>
+                }
+                else
+                {
+                    <span>Register</span>
+                }
+            </button>
+        </EditForm>
+
+        <div class="register-footer">
+            <p>Already have an account? <a href="/login">Login here</a></p>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegisterModel registerModel = new();
+    private string errorMessage = string.Empty;
+    private bool isLoading = false;
+
+    private async Task HandleRegister()
+    {
+        errorMessage = string.Empty;
+        isLoading = true;
+
+        try
+        {
+            if (registerModel.Password != registerModel.ConfirmPassword)
+            {
+                errorMessage = "Passwords do not match";
+                isLoading = false;
+                return;
+            }
+
+            var newUser = new User
+            {
+                FirstName = registerModel.FirstName,
+                LastName = registerModel.LastName,
+                Email = registerModel.Email,
+                PhoneNumber = registerModel.PhoneNumber,
+                Password = registerModel.Password,
+                Preferences = new UserPreferences()
+            };
+
+            var success = await UserSession.RegisterAsync(newUser);
+
+            if (success)
+            {
+                Navigation.NavigateTo("/profile");
+            }
+            else
+            {
+                errorMessage = "Email already exists. Please use a different email.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private bool IsValidEmail(string email)
+    {
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email);
+            return addr.Address == email;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private bool IsValidPhoneNumber(string phoneNumber)
+    {
+        var digitsOnly = new string(phoneNumber.Where(char.IsDigit).ToArray());
+        return digitsOnly.Length >= 7 && digitsOnly.Length <= 15;
+    }
+
+    private class RegisterModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "First name is required")]
+        public string FirstName { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Last name is required")]
+        public string LastName { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Email is required")]
+        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Invalid email format")]
+        public string Email { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Phone number is required")]
+        public string PhoneNumber { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Password is required")]
+        [System.ComponentModel.DataAnnotations.MinLength(6, ErrorMessage = "Password must be at least 6 characters")]
+        public string Password { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Please confirm your password")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}
+
+<style>
+    .register-container {
+        min-height: 80vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .register-card {
+        background: white;
+        border-radius: 12px;
+        padding: 40px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        width: 100%;
+        max-width: 500px;
+    }
+
+    .register-card h2 {
+        color: #333;
+        margin-bottom: 8px;
+        text-align: center;
+        font-size: 28px;
+    }
+
+    .subtitle {
+        color: #666;
+        text-align: center;
+        margin-bottom: 30px;
+        font-size: 14px;
+    }
+
+    .register-form {
+        margin-bottom: 20px;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: border-color 0.3s;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    .validation-feedback {
+        display: block;
+        margin-top: 5px;
+        font-size: 12px;
+    }
+
+    .validation-feedback.error {
+        color: #c33;
+    }
+
+    .validation-feedback.success {
+        color: #3c3;
+    }
+
+    .btn-primary {
+        width: 100%;
+        padding: 12px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s, opacity 0.3s;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .alert {
+        padding: 12px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        font-size: 14px;
+    }
+
+    .alert-danger {
+        background-color: #fee;
+        color: #c33;
+        border: 1px solid #fcc;
+    }
+
+    .register-footer {
+        text-align: center;
+        padding-top: 20px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .register-footer p {
+        color: #666;
+        font-size: 14px;
+    }
+
+    .register-footer a {
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .register-footer a:hover {
+        text-decoration: underline;
+    }
+
+    .validation-message {
+        color: #c33;
+        font-size: 12px;
+        margin-top: 5px;
+    }
+</style>

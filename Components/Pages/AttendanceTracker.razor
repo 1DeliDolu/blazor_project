@@ -1,0 +1,557 @@
+@page "/attendance"
+@using EventEase.Models
+@using EventEase.Services
+@inject UserSessionService UserSession
+@inject EventService EventService
+@inject RegistrationService RegistrationService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Attendance Tracker - EventEase</PageTitle>
+
+@if (!UserSession.IsUserLoggedIn())
+{
+    <div class="auth-prompt">
+        <div class="auth-card">
+            <h2>🔒 Authentication Required</h2>
+            <p>Please login to track event attendance</p>
+            <a href="/login?returnUrl=/attendance" class="btn btn-primary">Login</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="attendance-container">
+        <h1>📊 Event Attendance Tracker</h1>
+        <p class="subtitle">Monitor participation across all events</p>
+
+        @if (isLoading)
+        {
+            <div class="loading-state">
+                <p>Loading attendance data...</p>
+            </div>
+        }
+        else
+        {
+            <div class="stats-grid">
+                <div class="stat-card total">
+                    <div class="stat-icon">🎫</div>
+                    <div class="stat-content">
+                        <h3>@totalRegistrations</h3>
+                        <p>Total Registrations</p>
+                    </div>
+                </div>
+
+                <div class="stat-card confirmed">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-content">
+                        <h3>@confirmedCount</h3>
+                        <p>Confirmed</p>
+                    </div>
+                </div>
+
+                <div class="stat-card attended">
+                    <div class="stat-icon">👥</div>
+                    <div class="stat-content">
+                        <h3>@attendedCount</h3>
+                        <p>Attended</p>
+                    </div>
+                </div>
+
+                <div class="stat-card cancelled">
+                    <div class="stat-icon">❌</div>
+                    <div class="stat-content">
+                        <h3>@cancelledCount</h3>
+                        <p>Cancelled</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <label for="statusFilter">Filter by Status:</label>
+                <select id="statusFilter" @bind="selectedStatus" @bind:after="FilterRegistrations">
+                    <option value="">All Statuses</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Confirmed">Confirmed</option>
+                    <option value="Attended">Attended</option>
+                    <option value="Cancelled">Cancelled</option>
+                    <option value="NoShow">No Show</option>
+                </select>
+
+                <label for="eventFilter" style="margin-left: 20px;">Filter by Event:</label>
+                <select id="eventFilter" @bind="selectedEventId" @bind:after="FilterRegistrations">
+                    <option value="0">All Events</option>
+                    @foreach (var evt in allEvents)
+                    {
+                        <option value="@evt.Id">@evt.Name</option>
+                    }
+                </select>
+            </div>
+
+            @if (filteredRegistrations.Any())
+            {
+                <div class="registrations-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Event</th>
+                                <th>Attendee</th>
+                                <th>Email</th>
+                                <th>Tickets</th>
+                                <th>Registration Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var registration in filteredRegistrations)
+                            {
+                                var eventItem = allEvents.FirstOrDefault(e => e.Id == registration.EventId);
+                                <tr class="@GetRowClass(registration.Status)">
+                                    <td>
+                                        <strong>@(eventItem?.Name ?? "Unknown Event")</strong>
+                                        <br />
+                                        <small>@(eventItem?.Date.ToString("MMM dd, yyyy") ?? "")</small>
+                                    </td>
+                                    <td>@registration.FullName</td>
+                                    <td>@registration.Email</td>
+                                    <td class="text-center">@registration.NumberOfTickets</td>
+                                    <td>@registration.RegistrationDate.ToString("MMM dd, yyyy HH:mm")</td>
+                                    <td>
+                                        <span class="status-badge @registration.Status.ToString().ToLower()">
+                                            @GetStatusIcon(registration.Status) @registration.Status
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            @if (registration.Status == RegistrationStatus.Confirmed)
+                                            {
+                                                <button class="btn-action attend" @onclick="() => MarkAsAttended(registration.Id)">
+                                                    Mark Attended
+                                                </button>
+                                            }
+                                            @if (registration.Status == RegistrationStatus.Pending)
+                                            {
+                                                <button class="btn-action confirm" @onclick="() => ConfirmRegistration(registration.Id)">
+                                                    Confirm
+                                                </button>
+                                            }
+                                            @if (registration.Status != RegistrationStatus.Cancelled)
+                                            {
+                                                <button class="btn-action cancel" @onclick="() => CancelRegistration(registration.Id)">
+                                                    Cancel
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="attendance-summary">
+                    <h3>Attendance Summary</h3>
+                    <p>Showing @filteredRegistrations.Count of @allRegistrations.Count registrations</p>
+                    @if (selectedEventId > 0)
+                    {
+                        var eventItem = allEvents.FirstOrDefault(e => e.Id == selectedEventId);
+                        var eventRegs = allRegistrations.Where(r => r.EventId == selectedEventId).ToList();
+                        var totalTickets = eventRegs.Sum(r => r.NumberOfTickets);
+                        <div class="event-summary">
+                            <h4>@(eventItem?.Name ?? "Unknown Event")</h4>
+                            <p>📊 Total Registrations: @eventRegs.Count | 🎫 Total Tickets: @totalTickets</p>
+                            <p>✅ Confirmed: @eventRegs.Count(r => r.Status == RegistrationStatus.Confirmed) | 
+                               👥 Attended: @eventRegs.Count(r => r.Status == RegistrationStatus.Attended)</p>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="empty-state">
+                    <p>No registrations found with the selected filters.</p>
+                </div>
+            }
+        }
+    </div>
+}
+
+@code {
+    private List<Registration> allRegistrations = new();
+    private List<Registration> filteredRegistrations = new();
+    private List<Event> allEvents = new();
+    private bool isLoading = true;
+
+    private string selectedStatus = string.Empty;
+    private int selectedEventId = 0;
+
+    private int totalRegistrations = 0;
+    private int confirmedCount = 0;
+    private int attendedCount = 0;
+    private int cancelledCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        UserSession.OnChange += StateHasChanged;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+
+        try
+        {
+            allEvents = await EventService.GetAllEventsAsync();
+            
+            var currentUser = UserSession.GetCurrentUser();
+            if (currentUser != null)
+            {
+                // Load all registrations (in a real app, this would be admin-only)
+                allRegistrations = new List<Registration>();
+                foreach (var evt in allEvents)
+                {
+                    var eventRegs = await RegistrationService.GetEventRegistrationsAsync(evt.Id);
+                    allRegistrations.AddRange(eventRegs);
+                }
+
+                filteredRegistrations = allRegistrations;
+                UpdateStatistics();
+            }
+        }
+        catch (Exception)
+        {
+            // Handle error
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void FilterRegistrations()
+    {
+        filteredRegistrations = allRegistrations;
+
+        if (!string.IsNullOrEmpty(selectedStatus))
+        {
+            if (Enum.TryParse<RegistrationStatus>(selectedStatus, out var status))
+            {
+                filteredRegistrations = filteredRegistrations.Where(r => r.Status == status).ToList();
+            }
+        }
+
+        if (selectedEventId > 0)
+        {
+            filteredRegistrations = filteredRegistrations.Where(r => r.EventId == selectedEventId).ToList();
+        }
+    }
+
+    private void UpdateStatistics()
+    {
+        totalRegistrations = allRegistrations.Count;
+        confirmedCount = allRegistrations.Count(r => r.Status == RegistrationStatus.Confirmed);
+        attendedCount = allRegistrations.Count(r => r.Status == RegistrationStatus.Attended);
+        cancelledCount = allRegistrations.Count(r => r.Status == RegistrationStatus.Cancelled);
+    }
+
+    private async Task MarkAsAttended(int registrationId)
+    {
+        await RegistrationService.UpdateRegistrationStatusAsync(registrationId, RegistrationStatus.Attended);
+        await LoadData();
+    }
+
+    private async Task ConfirmRegistration(int registrationId)
+    {
+        await RegistrationService.UpdateRegistrationStatusAsync(registrationId, RegistrationStatus.Confirmed);
+        await LoadData();
+    }
+
+    private async Task CancelRegistration(int registrationId)
+    {
+        await RegistrationService.CancelRegistrationAsync(registrationId);
+        await LoadData();
+    }
+
+    private string GetRowClass(RegistrationStatus status)
+    {
+        return status switch
+        {
+            RegistrationStatus.Attended => "row-attended",
+            RegistrationStatus.Cancelled => "row-cancelled",
+            RegistrationStatus.Confirmed => "row-confirmed",
+            _ => ""
+        };
+    }
+
+    private string GetStatusIcon(RegistrationStatus status)
+    {
+        return status switch
+        {
+            RegistrationStatus.Pending => "⏳",
+            RegistrationStatus.Confirmed => "✅",
+            RegistrationStatus.Attended => "👥",
+            RegistrationStatus.Cancelled => "❌",
+            RegistrationStatus.NoShow => "⚠️",
+            _ => "❓"
+        };
+    }
+
+    public void Dispose()
+    {
+        UserSession.OnChange -= StateHasChanged;
+    }
+}
+
+<style>
+    .attendance-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .attendance-container h1 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 10px;
+    }
+
+    .subtitle {
+        text-align: center;
+        color: #666;
+        margin-bottom: 30px;
+    }
+
+    .auth-prompt {
+        min-height: 60vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .auth-card {
+        text-align: center;
+        padding: 40px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        border-left: 4px solid #667eea;
+    }
+
+    .stat-card.confirmed { border-left-color: #28a745; }
+    .stat-card.attended { border-left-color: #17a2b8; }
+    .stat-card.cancelled { border-left-color: #dc3545; }
+
+    .stat-icon {
+        font-size: 3rem;
+    }
+
+    .stat-content h3 {
+        margin: 0;
+        font-size: 2rem;
+        color: #333;
+    }
+
+    .stat-content p {
+        margin: 5px 0 0 0;
+        color: #666;
+        font-size: 0.9rem;
+    }
+
+    .filter-section {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .filter-section label {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .filter-section select {
+        padding: 8px 15px;
+        border: 2px solid #e0e0e0;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+
+    .registrations-table {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    thead {
+        background: #667eea;
+        color: white;
+    }
+
+    th {
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+    }
+
+    td {
+        padding: 15px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    tbody tr {
+        transition: background-color 0.2s;
+    }
+
+    tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    .row-attended { background-color: #d4edda; }
+    .row-cancelled { background-color: #f8d7da; }
+    .row-confirmed { background-color: #d1ecf1; }
+
+    .text-center {
+        text-align: center;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .status-badge.pending { background: #ffc107; color: #000; }
+    .status-badge.confirmed { background: #28a745; color: white; }
+    .status-badge.attended { background: #17a2b8; color: white; }
+    .status-badge.cancelled { background: #dc3545; color: white; }
+    .status-badge.noshow { background: #ff9800; color: white; }
+
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .btn-action {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 600;
+    }
+
+    .btn-action.attend {
+        background: #17a2b8;
+        color: white;
+    }
+
+    .btn-action.attend:hover {
+        background: #138496;
+    }
+
+    .btn-action.confirm {
+        background: #28a745;
+        color: white;
+    }
+
+    .btn-action.confirm:hover {
+        background: #218838;
+    }
+
+    .btn-action.cancel {
+        background: #dc3545;
+        color: white;
+    }
+
+    .btn-action.cancel:hover {
+        background: #c82333;
+    }
+
+    .attendance-summary {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .attendance-summary h3 {
+        margin-top: 0;
+        color: #333;
+    }
+
+    .event-summary {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .event-summary h4 {
+        margin: 0 0 10px 0;
+        color: #667eea;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .empty-state p {
+        color: #666;
+        font-size: 16px;
+    }
+
+    .loading-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        text-decoration: none;
+        display: inline-block;
+        cursor: pointer;
+    }
+</style>

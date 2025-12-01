@@ -7,8 +7,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Register EventService
+// Register Services
 builder.Services.AddScoped<EventService>();
+builder.Services.AddScoped<UserSessionService>();
+builder.Services.AddScoped<RegistrationService>();
 
 var app = builder.Build();
 

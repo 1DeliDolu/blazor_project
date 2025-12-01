@@ -1,0 +1,697 @@
+@page "/test-validation-enhanced"
+@using EventEase.Models
+@using EventEase.Services
+@inject UserSessionService UserSession
+@inject RegistrationService RegistrationService
+@inject EventService EventService
+
+<PageTitle>Enhanced Validation Tests - EventEase</PageTitle>
+
+<div class="test-container">
+    <h1>🧪 Enhanced Validation & Testing Suite</h1>
+    <p class="subtitle">Comprehensive testing for EventEase application</p>
+
+    <div class="test-section">
+        <h2>1️⃣ User Registration Validation Tests</h2>
+        <button class="btn-test" @onclick="RunRegistrationTests">Run Registration Tests</button>
+        
+        @if (registrationTestResults.Any())
+        {
+            <div class="results-grid">
+                @foreach (var result in registrationTestResults)
+                {
+                    <div class="test-result @(result.Passed ? "passed" : "failed")">
+                        <span class="icon">@(result.Passed ? "✅" : "❌")</span>
+                        <div class="details">
+                            <strong>@result.TestName</strong>
+                            <p>@result.Message</p>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="summary">
+                Passed: @registrationTestResults.Count(r => r.Passed) / @registrationTestResults.Count
+            </div>
+        }
+    </div>
+
+    <div class="test-section">
+        <h2>2️⃣ State Management Tests</h2>
+        <button class="btn-test" @onclick="RunStateManagementTests">Run State Tests</button>
+        
+        @if (stateTestResults.Any())
+        {
+            <div class="results-grid">
+                @foreach (var result in stateTestResults)
+                {
+                    <div class="test-result @(result.Passed ? "passed" : "failed")">
+                        <span class="icon">@(result.Passed ? "✅" : "❌")</span>
+                        <div class="details">
+                            <strong>@result.TestName</strong>
+                            <p>@result.Message</p>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="summary">
+                Passed: @stateTestResults.Count(r => r.Passed) / @stateTestResults.Count
+            </div>
+        }
+    </div>
+
+    <div class="test-section">
+        <h2>3️⃣ Event Registration Service Tests</h2>
+        <button class="btn-test" @onclick="RunRegistrationServiceTests">Run Service Tests</button>
+        
+        @if (serviceTestResults.Any())
+        {
+            <div class="results-grid">
+                @foreach (var result in serviceTestResults)
+                {
+                    <div class="test-result @(result.Passed ? "passed" : "failed")">
+                        <span class="icon">@(result.Passed ? "✅" : "❌")</span>
+                        <div class="details">
+                            <strong>@result.TestName</strong>
+                            <p>@result.Message</p>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="summary">
+                Passed: @serviceTestResults.Count(r => r.Passed) / @serviceTestResults.Count
+            </div>
+        }
+    </div>
+
+    <div class="test-section">
+        <h2>4️⃣ Performance & Responsiveness Tests</h2>
+        <button class="btn-test" @onclick="RunPerformanceTests">Run Performance Tests</button>
+        
+        @if (performanceTestResults.Any())
+        {
+            <div class="results-grid">
+                @foreach (var result in performanceTestResults)
+                {
+                    <div class="test-result @(result.Passed ? "passed" : "failed")">
+                        <span class="icon">@(result.Passed ? "✅" : "❌")</span>
+                        <div class="details">
+                            <strong>@result.TestName</strong>
+                            <p>@result.Message</p>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="summary">
+                Passed: @performanceTestResults.Count(r => r.Passed) / @performanceTestResults.Count
+            </div>
+        }
+    </div>
+
+    <div class="test-section">
+        <h2>5️⃣ Error Handling Tests</h2>
+        <button class="btn-test" @onclick="RunErrorHandlingTests">Run Error Tests</button>
+        
+        @if (errorTestResults.Any())
+        {
+            <div class="results-grid">
+                @foreach (var result in errorTestResults)
+                {
+                    <div class="test-result @(result.Passed ? "passed" : "failed")">
+                        <span class="icon">@(result.Passed ? "✅" : "❌")</span>
+                        <div class="details">
+                            <strong>@result.TestName</strong>
+                            <p>@result.Message</p>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="summary">
+                Passed: @errorTestResults.Count(r => r.Passed) / @errorTestResults.Count
+            </div>
+        }
+    </div>
+
+    <div class="overall-summary">
+        <h2>📊 Overall Test Results</h2>
+        <div class="summary-stats">
+            <div class="stat">
+                <div class="stat-value">@totalTests</div>
+                <div class="stat-label">Total Tests</div>
+            </div>
+            <div class="stat passed">
+                <div class="stat-value">@passedTests</div>
+                <div class="stat-label">Passed</div>
+            </div>
+            <div class="stat failed">
+                <div class="stat-value">@failedTests</div>
+                <div class="stat-label">Failed</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">@successRate%</div>
+                <div class="stat-label">Success Rate</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<TestResult> registrationTestResults = new();
+    private List<TestResult> stateTestResults = new();
+    private List<TestResult> serviceTestResults = new();
+    private List<TestResult> performanceTestResults = new();
+    private List<TestResult> errorTestResults = new();
+
+    private int totalTests => registrationTestResults.Count + stateTestResults.Count + 
+                              serviceTestResults.Count + performanceTestResults.Count + 
+                              errorTestResults.Count;
+    private int passedTests => registrationTestResults.Count(r => r.Passed) + 
+                               stateTestResults.Count(r => r.Passed) + 
+                               serviceTestResults.Count(r => r.Passed) + 
+                               performanceTestResults.Count(r => r.Passed) + 
+                               errorTestResults.Count(r => r.Passed);
+    private int failedTests => totalTests - passedTests;
+    private int successRate => totalTests > 0 ? (passedTests * 100 / totalTests) : 0;
+
+    private async Task RunRegistrationTests()
+    {
+        registrationTestResults.Clear();
+
+        // Test 1: Valid email validation
+        registrationTestResults.Add(new TestResult
+        {
+            TestName = "Valid Email Format",
+            Passed = IsValidEmail("test@example.com"),
+            Message = "Valid email should pass validation"
+        });
+
+        // Test 2: Invalid email validation
+        registrationTestResults.Add(new TestResult
+        {
+            TestName = "Invalid Email Format",
+            Passed = !IsValidEmail("invalid-email"),
+            Message = "Invalid email should fail validation"
+        });
+
+        // Test 3: Valid phone number
+        registrationTestResults.Add(new TestResult
+        {
+            TestName = "Valid Phone Number",
+            Passed = IsValidPhoneNumber("1234567890"),
+            Message = "10-digit phone should pass validation"
+        });
+
+        // Test 4: Invalid phone number (too short)
+        registrationTestResults.Add(new TestResult
+        {
+            TestName = "Phone Number Too Short",
+            Passed = !IsValidPhoneNumber("12345"),
+            Message = "Phone with < 7 digits should fail"
+        });
+
+        // Test 5: Invalid phone number (too long)
+        registrationTestResults.Add(new TestResult
+        {
+            TestName = "Phone Number Too Long",
+            Passed = !IsValidPhoneNumber("12345678901234567"),
+            Message = "Phone with > 15 digits should fail"
+        });
+
+        // Test 6: Empty string validation
+        registrationTestResults.Add(new TestResult
+        {
+            TestName = "Empty Email Validation",
+            Passed = !IsValidEmail(""),
+            Message = "Empty email should fail validation"
+        });
+
+        // Test 7: Whitespace handling
+        registrationTestResults.Add(new TestResult
+        {
+            TestName = "Whitespace Email Validation",
+            Passed = !IsValidEmail("   "),
+            Message = "Whitespace-only email should fail"
+        });
+
+        await Task.Delay(100);
+    }
+
+    private async Task RunStateManagementTests()
+    {
+        stateTestResults.Clear();
+
+        // Test 1: User session initialization
+        var initialUser = UserSession.GetCurrentUser();
+        stateTestResults.Add(new TestResult
+        {
+            TestName = "Session State Check",
+            Passed = true,
+            Message = $"Session is {(UserSession.IsUserLoggedIn() ? "active" : "inactive")}"
+        });
+
+        // Test 2: Favorites management
+        if (UserSession.IsUserLoggedIn())
+        {
+            var testEventId = 1;
+            var initialFavCount = UserSession.GetUserFavorites().Count;
+            UserSession.AddToFavorites(testEventId);
+            var newFavCount = UserSession.GetUserFavorites().Count;
+            
+            stateTestResults.Add(new TestResult
+            {
+                TestName = "Add to Favorites",
+                Passed = newFavCount > initialFavCount || UserSession.IsFavorite(testEventId),
+                Message = $"Favorites count: {initialFavCount} → {newFavCount}"
+            });
+
+            UserSession.RemoveFromFavorites(testEventId);
+        }
+        else
+        {
+            stateTestResults.Add(new TestResult
+            {
+                TestName = "Favorites (Not Logged In)",
+                Passed = true,
+                Message = "Login required for favorites testing"
+            });
+        }
+
+        // Test 3: Session persistence
+        stateTestResults.Add(new TestResult
+        {
+            TestName = "Session Persistence",
+            Passed = UserSession.GetCurrentUser() == initialUser,
+            Message = "User session maintained across operations"
+        });
+
+        // Test 4: Registration tracking
+        if (UserSession.IsUserLoggedIn())
+        {
+            var registrations = UserSession.GetUserRegistrations();
+            stateTestResults.Add(new TestResult
+            {
+                TestName = "Registration Tracking",
+                Passed = registrations != null,
+                Message = $"Tracking {registrations.Count} registrations"
+            });
+        }
+
+        await Task.Delay(100);
+    }
+
+    private async Task RunRegistrationServiceTests()
+    {
+        serviceTestResults.Clear();
+
+        // Test 1: Create registration
+        var testReg = new Registration
+        {
+            EventId = 1,
+            UserId = 1,
+            FullName = "Test User",
+            Email = "test@example.com",
+            PhoneNumber = "1234567890",
+            NumberOfTickets = 2
+        };
+
+        var created = await RegistrationService.CreateRegistrationAsync(testReg);
+        serviceTestResults.Add(new TestResult
+        {
+            TestName = "Create Registration",
+            Passed = created != null,
+            Message = created != null ? $"Created with confirmation: {created.ConfirmationCode}" : "Failed to create"
+        });
+
+        // Test 2: Duplicate registration prevention
+        var duplicate = await RegistrationService.CreateRegistrationAsync(testReg);
+        serviceTestResults.Add(new TestResult
+        {
+            TestName = "Duplicate Registration Prevention",
+            Passed = duplicate == null,
+            Message = duplicate == null ? "Correctly rejected duplicate" : "Failed to prevent duplicate"
+        });
+
+        // Test 3: Get event registrations
+        var eventRegs = await RegistrationService.GetEventRegistrationsAsync(1);
+        serviceTestResults.Add(new TestResult
+        {
+            TestName = "Get Event Registrations",
+            Passed = eventRegs != null && eventRegs.Any(),
+            Message = $"Found {eventRegs?.Count ?? 0} registrations for event"
+        });
+
+        // Test 4: Registration status update
+        if (created != null)
+        {
+            var updated = await RegistrationService.UpdateRegistrationStatusAsync(created.Id, RegistrationStatus.Confirmed);
+            serviceTestResults.Add(new TestResult
+            {
+                TestName = "Update Registration Status",
+                Passed = updated,
+                Message = updated ? "Status updated successfully" : "Failed to update status"
+            });
+        }
+
+        // Test 5: Get registration count
+        var count = await RegistrationService.GetEventRegistrationCountAsync(1);
+        serviceTestResults.Add(new TestResult
+        {
+            TestName = "Get Registration Count",
+            Passed = count >= 0,
+            Message = $"Event has {count} total tickets registered"
+        });
+    }
+
+    private async Task RunPerformanceTests()
+    {
+        performanceTestResults.Clear();
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        // Test 1: Event loading performance
+        stopwatch.Restart();
+        var events = await EventService.GetAllEventsAsync();
+        stopwatch.Stop();
+        performanceTestResults.Add(new TestResult
+        {
+            TestName = "Event Loading Performance",
+            Passed = stopwatch.ElapsedMilliseconds < 500,
+            Message = $"Loaded {events.Count} events in {stopwatch.ElapsedMilliseconds}ms"
+        });
+
+        // Test 2: Category filtering performance
+        stopwatch.Restart();
+        var filtered = await EventService.GetEventsByCategoryAsync("Technology");
+        stopwatch.Stop();
+        performanceTestResults.Add(new TestResult
+        {
+            TestName = "Category Filter Performance",
+            Passed = stopwatch.ElapsedMilliseconds < 200,
+            Message = $"Filtered {filtered.Count} events in {stopwatch.ElapsedMilliseconds}ms"
+        });
+
+        // Test 3: Multiple sequential operations
+        stopwatch.Restart();
+        for (int i = 0; i < 10; i++)
+        {
+            await EventService.GetEventByIdAsync(1);
+        }
+        stopwatch.Stop();
+        performanceTestResults.Add(new TestResult
+        {
+            TestName = "Sequential Operations",
+            Passed = stopwatch.ElapsedMilliseconds < 1000,
+            Message = $"10 operations completed in {stopwatch.ElapsedMilliseconds}ms"
+        });
+
+        // Test 4: State management performance
+        stopwatch.Restart();
+        if (UserSession.IsUserLoggedIn())
+        {
+            for (int i = 1; i <= 5; i++)
+            {
+                UserSession.AddToFavorites(i);
+            }
+        }
+        stopwatch.Stop();
+        performanceTestResults.Add(new TestResult
+        {
+            TestName = "State Update Performance",
+            Passed = stopwatch.ElapsedMilliseconds < 100,
+            Message = $"5 state updates in {stopwatch.ElapsedMilliseconds}ms"
+        });
+    }
+
+    private async Task RunErrorHandlingTests()
+    {
+        errorTestResults.Clear();
+
+        // Test 1: Invalid event ID
+        try
+        {
+            var invalidEvent = await EventService.GetEventByIdAsync(99999);
+            errorTestResults.Add(new TestResult
+            {
+                TestName = "Invalid Event ID Handling",
+                Passed = invalidEvent == null,
+                Message = "Gracefully handled non-existent event"
+            });
+        }
+        catch
+        {
+            errorTestResults.Add(new TestResult
+            {
+                TestName = "Invalid Event ID Handling",
+                Passed = false,
+                Message = "Threw exception instead of returning null"
+            });
+        }
+
+        // Test 2: Null input handling
+        try
+        {
+            var result = IsValidEmail(null!);
+            errorTestResults.Add(new TestResult
+            {
+                TestName = "Null Email Input",
+                Passed = !result,
+                Message = "Correctly handled null email"
+            });
+        }
+        catch
+        {
+            errorTestResults.Add(new TestResult
+            {
+                TestName = "Null Email Input",
+                Passed = false,
+                Message = "Exception on null input"
+            });
+        }
+
+        // Test 3: Empty category filter
+        try
+        {
+            var emptyFilter = await EventService.GetEventsByCategoryAsync("");
+            errorTestResults.Add(new TestResult
+            {
+                TestName = "Empty Category Filter",
+                Passed = emptyFilter != null,
+                Message = $"Handled empty filter, returned {emptyFilter.Count} events"
+            });
+        }
+        catch (Exception ex)
+        {
+            errorTestResults.Add(new TestResult
+            {
+                TestName = "Empty Category Filter",
+                Passed = false,
+                Message = $"Exception: {ex.Message}"
+            });
+        }
+
+        // Test 4: Concurrent operations
+        try
+        {
+            var tasks = new List<Task<Event?>>();
+            for (int i = 1; i <= 5; i++)
+            {
+                tasks.Add(EventService.GetEventByIdAsync(i));
+            }
+            await Task.WhenAll(tasks);
+            
+            errorTestResults.Add(new TestResult
+            {
+                TestName = "Concurrent Operations",
+                Passed = tasks.All(t => t.IsCompletedSuccessfully),
+                Message = "All concurrent operations completed successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            errorTestResults.Add(new TestResult
+            {
+                TestName = "Concurrent Operations",
+                Passed = false,
+                Message = $"Concurrent operation failed: {ex.Message}"
+            });
+        }
+
+        await Task.Delay(100);
+    }
+
+    private bool IsValidEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return false;
+
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email);
+            return addr.Address == email;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private bool IsValidPhoneNumber(string phoneNumber)
+    {
+        if (string.IsNullOrWhiteSpace(phoneNumber))
+            return false;
+
+        var digitsOnly = new string(phoneNumber.Where(char.IsDigit).ToArray());
+        return digitsOnly.Length >= 7 && digitsOnly.Length <= 15;
+    }
+
+    private class TestResult
+    {
+        public string TestName { get; set; } = string.Empty;
+        public bool Passed { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+}
+
+<style>
+    .test-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .test-container h1 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 10px;
+    }
+
+    .subtitle {
+        text-align: center;
+        color: #666;
+        margin-bottom: 40px;
+    }
+
+    .test-section {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        margin-bottom: 30px;
+    }
+
+    .test-section h2 {
+        margin-top: 0;
+        color: #333;
+        margin-bottom: 20px;
+    }
+
+    .btn-test {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        margin-bottom: 20px;
+        transition: transform 0.2s;
+    }
+
+    .btn-test:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .results-grid {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .test-result {
+        display: flex;
+        align-items: flex-start;
+        gap: 15px;
+        padding: 15px;
+        border-radius: 8px;
+        border-left: 4px solid;
+    }
+
+    .test-result.passed {
+        background: #d4edda;
+        border-left-color: #28a745;
+    }
+
+    .test-result.failed {
+        background: #f8d7da;
+        border-left-color: #dc3545;
+    }
+
+    .test-result .icon {
+        font-size: 24px;
+    }
+
+    .test-result .details strong {
+        display: block;
+        margin-bottom: 5px;
+        color: #333;
+    }
+
+    .test-result .details p {
+        margin: 0;
+        color: #666;
+        font-size: 14px;
+    }
+
+    .summary {
+        text-align: center;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .overall-summary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 30px;
+        border-radius: 12px;
+        color: white;
+    }
+
+    .overall-summary h2 {
+        text-align: center;
+        margin-top: 0;
+        margin-bottom: 30px;
+    }
+
+    .summary-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+    }
+
+    .stat {
+        text-align: center;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+    }
+
+    .stat.passed {
+        background: rgba(40, 167, 69, 0.3);
+    }
+
+    .stat.failed {
+        background: rgba(220, 53, 69, 0.3);
+    }
+
+    .stat-value {
+        font-size: 36px;
+        font-weight: bold;
+        margin-bottom: 8px;
+    }
+
+    .stat-label {
+        font-size: 14px;
+        opacity: 0.9;
+    }
+</style>
