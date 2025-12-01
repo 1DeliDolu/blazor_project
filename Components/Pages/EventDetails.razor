@@ -1,0 +1,227 @@
+@page "/event/{EventId:int}"
+@using EventEase.Models
+@using EventEase.Services
+@inject EventService EventService
+@inject NavigationManager Navigation
+
+<PageTitle>Event Details</PageTitle>
+
+<div class="event-details-container">
+    @if (isLoading)
+    {
+        <p><em>Loading event details...</em></p>
+    }
+    else if (eventItem == null)
+    {
+        <div class="error-message">
+            <h2>Event Not Found</h2>
+            <p>The event you're looking for doesn't exist.</p>
+            <button class="btn-back" @onclick="NavigateToEvents">Back to Events</button>
+        </div>
+    }
+    else
+    {
+        <div class="details-card">
+            <div class="details-header">
+                <h1>@eventItem.Name</h1>
+                <span class="category-badge">@eventItem.Category</span>
+            </div>
+            
+            <div class="details-body">
+                <div class="detail-row">
+                    <span class="detail-icon">📅</span>
+                    <div class="detail-content">
+                        <strong>Date:</strong>
+                        <p>@eventItem.Date.ToString("MMMM dd, yyyy - hh:mm tt")</p>
+                    </div>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-icon">📍</span>
+                    <div class="detail-content">
+                        <strong>Location:</strong>
+                        <p>@eventItem.Location</p>
+                    </div>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-icon">👥</span>
+                    <div class="detail-content">
+                        <strong>Capacity:</strong>
+                        <p>@eventItem.Capacity people</p>
+                    </div>
+                </div>
+                
+                <div class="detail-row full-width">
+                    <span class="detail-icon">📝</span>
+                    <div class="detail-content">
+                        <strong>Description:</strong>
+                        <p>@eventItem.Description</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="details-footer">
+                <button class="btn-register" @onclick="NavigateToRegistration">Register for Event</button>
+                <button class="btn-back" @onclick="NavigateToEvents">Back to Events</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int EventId { get; set; }
+
+    private Event? eventItem;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEventDetails();
+    }
+
+    private async Task LoadEventDetails()
+    {
+        isLoading = true;
+        eventItem = await EventService.GetEventByIdAsync(EventId);
+        isLoading = false;
+    }
+
+    private void NavigateToRegistration()
+    {
+        Navigation.NavigateTo($"/event/{EventId}/register");
+    }
+
+    private void NavigateToEvents()
+    {
+        Navigation.NavigateTo("/events");
+    }
+}
+
+<style>
+    .event-details-container {
+        padding: 20px;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .details-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+
+    .details-header {
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        color: white;
+        padding: 30px;
+        text-align: center;
+        position: relative;
+    }
+
+    .details-header h1 {
+        margin: 0 0 15px 0;
+        font-size: 2rem;
+    }
+
+    .category-badge {
+        background: rgba(255,255,255,0.2);
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        display: inline-block;
+    }
+
+    .details-body {
+        padding: 30px;
+    }
+
+    .detail-row {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 25px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .detail-row.full-width {
+        flex-direction: column;
+    }
+
+    .detail-row:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+
+    .detail-icon {
+        font-size: 2rem;
+        margin-right: 15px;
+        min-width: 40px;
+    }
+
+    .detail-content {
+        flex: 1;
+    }
+
+    .detail-content strong {
+        color: #007bff;
+        display: block;
+        margin-bottom: 5px;
+        font-size: 1.1rem;
+    }
+
+    .detail-content p {
+        margin: 0;
+        color: #333;
+        line-height: 1.6;
+    }
+
+    .details-footer {
+        padding: 30px;
+        background: #f8f9fa;
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+    }
+
+    .btn-register, .btn-back {
+        padding: 12px 30px;
+        border: none;
+        border-radius: 5px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .btn-register {
+        background-color: #28a745;
+        color: white;
+    }
+
+    .btn-register:hover {
+        background-color: #218838;
+        transform: translateY(-2px);
+    }
+
+    .btn-back {
+        background-color: #6c757d;
+        color: white;
+    }
+
+    .btn-back:hover {
+        background-color: #5a6268;
+        transform: translateY(-2px);
+    }
+
+    .error-message {
+        text-align: center;
+        padding: 50px;
+    }
+
+    .error-message h2 {
+        color: #dc3545;
+        margin-bottom: 15px;
+    }
+</style>
