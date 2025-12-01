@@ -7,7 +7,13 @@
 <PageTitle>Event Details</PageTitle>
 
 <div class="event-details-container">
-    @if (isLoading)
+    @if (hasError)
+    {
+        <CustomErrorDisplay 
+            ErrorMessage="@errorMessage" 
+            OnRecover="RetryLoadEvent" />
+    }
+    else if (isLoading)
     {
         <p><em>Loading event details...</em></p>
     }
@@ -75,6 +81,8 @@
 
     private Event? eventItem;
     private bool isLoading = true;
+    private bool hasError = false;
+    private string errorMessage = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -83,9 +91,24 @@
 
     private async Task LoadEventDetails()
     {
-        isLoading = true;
-        eventItem = await EventService.GetEventByIdAsync(EventId);
-        isLoading = false;
+        try
+        {
+            isLoading = true;
+            hasError = false;
+            eventItem = await EventService.GetEventByIdAsync(EventId);
+            isLoading = false;
+        }
+        catch (Exception)
+        {
+            isLoading = false;
+            hasError = true;
+            errorMessage = "Failed to load event details. Please try again.";
+        }
+    }
+
+    private async Task RetryLoadEvent()
+    {
+        await LoadEventDetails();
     }
 
     private void NavigateToRegistration()

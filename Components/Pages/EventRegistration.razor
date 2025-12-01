@@ -1,6 +1,7 @@
 @page "/event/{EventId:int}/register"
 @using EventEase.Models
 @using EventEase.Services
+@using System.Linq
 @inject EventService EventService
 @inject NavigationManager Navigation
 
@@ -60,8 +61,13 @@
                         <input type="email" 
                                id="email" 
                                @bind="registrationData.Email" 
+                               @bind:event="oninput"
                                placeholder="Enter your email"
-                               class="form-control" />
+                               class="form-control @(string.IsNullOrEmpty(registrationData.Email) || IsValidEmail(registrationData.Email) ? "" : "invalid")" />
+                        @if (!string.IsNullOrEmpty(registrationData.Email) && !IsValidEmail(registrationData.Email))
+                        {
+                            <span class="validation-message">Please enter a valid email address</span>
+                        }
                     </div>
 
                     <div class="form-group">
@@ -69,8 +75,13 @@
                         <input type="tel" 
                                id="phone" 
                                @bind="registrationData.PhoneNumber" 
+                               @bind:event="oninput"
                                placeholder="Enter your phone number"
-                               class="form-control" />
+                               class="form-control @(string.IsNullOrEmpty(registrationData.PhoneNumber) || IsValidPhoneNumber(registrationData.PhoneNumber) ? "" : "invalid")" />
+                        @if (!string.IsNullOrEmpty(registrationData.PhoneNumber) && !IsValidPhoneNumber(registrationData.PhoneNumber))
+                        {
+                            <span class="validation-message">Please enter a valid phone number (7-15 digits)</span>
+                        }
                     </div>
 
                     <div class="form-group">
@@ -146,10 +157,39 @@
     private bool IsFormValid()
     {
         return !string.IsNullOrWhiteSpace(registrationData.FullName) &&
-               !string.IsNullOrWhiteSpace(registrationData.Email) &&
-               !string.IsNullOrWhiteSpace(registrationData.PhoneNumber) &&
+               IsValidEmail(registrationData.Email) &&
+               IsValidPhoneNumber(registrationData.PhoneNumber) &&
                registrationData.NumberOfTickets > 0 &&
+               registrationData.NumberOfTickets <= 10 &&
                registrationData.AcceptTerms;
+    }
+
+    private bool IsValidEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return false;
+
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email);
+            return addr.Address == email;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private bool IsValidPhoneNumber(string phoneNumber)
+    {
+        if (string.IsNullOrWhiteSpace(phoneNumber))
+            return false;
+
+        // Remove common separators
+        var cleanedNumber = phoneNumber.Replace("-", "").Replace("(", "").Replace(")", "").Replace(" ", "");
+        
+        // Check if it contains only digits and has reasonable length (7-15 digits)
+        return cleanedNumber.All(char.IsDigit) && cleanedNumber.Length >= 7 && cleanedNumber.Length <= 15;
     }
 
     private void SubmitRegistration()
@@ -397,5 +437,16 @@
     .error-message h2 {
         color: #dc3545;
         margin-bottom: 15px;
+    }
+
+    .form-control.invalid {
+        border-color: #dc3545;
+    }
+
+    .validation-message {
+        display: block;
+        color: #dc3545;
+        font-size: 0.875rem;
+        margin-top: 5px;
     }
 </style>

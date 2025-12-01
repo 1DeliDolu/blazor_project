@@ -1,0 +1,87 @@
+@* Custom Error Display Component *@
+
+<div class="custom-error-display">
+    <div class="error-icon">⚠️</div>
+    <h2>Oops! Something went wrong</h2>
+    <p>@ErrorMessage</p>
+    <div class="error-actions">
+        <button class="btn-retry" @onclick="Recover">Try Again</button>
+        <a href="/" class="btn-home">Go to Home</a>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string ErrorMessage { get; set; } = "An unexpected error occurred. Please try again.";
+
+    [Parameter]
+    public EventCallback OnRecover { get; set; }
+
+    private async Task Recover()
+    {
+        await OnRecover.InvokeAsync();
+    }
+}
+
+<style>
+    .custom-error-display {
+        max-width: 600px;
+        margin: 50px auto;
+        padding: 40px;
+        text-align: center;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .error-icon {
+        font-size: 4rem;
+        margin-bottom: 20px;
+    }
+
+    .custom-error-display h2 {
+        color: #dc3545;
+        margin-bottom: 15px;
+    }
+
+    .custom-error-display p {
+        color: #666;
+        margin-bottom: 30px;
+        font-size: 1.1rem;
+    }
+
+    .error-actions {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+    }
+
+    .btn-retry, .btn-home {
+        padding: 12px 30px;
+        border: none;
+        border-radius: 5px;
+        font-size: 1rem;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.3s;
+    }
+
+    .btn-retry {
+        background-color: #007bff;
+        color: white;
+    }
+
+    .btn-retry:hover {
+        background-color: #0056b3;
+    }
+
+    .btn-home {
+        background-color: #6c757d;
+        color: white;
+    }
+
+    .btn-home:hover {
+        background-color: #5a6268;
+    }
+</style>
