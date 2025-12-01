@@ -94,14 +94,8 @@
                 successMessage = "Login successful! Redirecting...";
                 await Task.Delay(1000); // Brief delay to show success message
                 
-                if (!string.IsNullOrEmpty(ReturnUrl))
-                {
-                    Navigation.NavigateTo(ReturnUrl);
-                }
-                else
-                {
-                    Navigation.NavigateTo("/profile");
-                }
+                // Always redirect to profile after login
+                Navigation.NavigateTo("/profile");
             }
             else
             {
