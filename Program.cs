@@ -1,10 +1,14 @@
 using EventEase.Components;
+using EventEase.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Register EventService
+builder.Services.AddScoped<EventService>();
 
 var app = builder.Build();
 
