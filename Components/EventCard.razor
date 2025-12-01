@@ -1,0 +1,102 @@
+@* EventCard Component - Displays event information in a card format *@
+
+<div class="event-card">
+    <div class="event-card-header">
+        <h3>@EventName</h3>
+    </div>
+    <div class="event-card-body">
+        <div class="event-detail">
+            <span class="detail-label">📅 Date:</span>
+            <span class="detail-value">@EventDate.ToString("MMMM dd, yyyy")</span>
+        </div>
+        <div class="event-detail">
+            <span class="detail-label">📍 Location:</span>
+            <span class="detail-value">@Location</span>
+        </div>
+    </div>
+    <div class="event-card-footer">
+        <button class="btn-details" @onclick="OnViewDetails">View Details</button>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string EventName { get; set; } = string.Empty;
+
+    [Parameter]
+    public DateTime EventDate { get; set; }
+
+    [Parameter]
+    public string Location { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback OnViewDetails { get; set; }
+}
+
+<style>
+    .event-card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+        background-color: white;
+    }
+
+    .event-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .event-card-header {
+        border-bottom: 2px solid #007bff;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+
+    .event-card-header h3 {
+        margin: 0;
+        color: #333;
+        font-size: 1.5rem;
+    }
+
+    .event-card-body {
+        margin-bottom: 15px;
+    }
+
+    .event-detail {
+        display: flex;
+        margin-bottom: 10px;
+        align-items: center;
+    }
+
+    .detail-label {
+        font-weight: bold;
+        margin-right: 8px;
+        color: #666;
+    }
+
+    .detail-value {
+        color: #333;
+    }
+
+    .event-card-footer {
+        text-align: center;
+    }
+
+    .btn-details {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: background-color 0.2s;
+    }
+
+    .btn-details:hover {
+        background-color: #0056b3;
+    }
+</style>
