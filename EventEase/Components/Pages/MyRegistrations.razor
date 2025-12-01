@@ -1,0 +1,176 @@
+@page "/my-registrations"
+@using EventEase.Models
+@using EventEase.Services
+@inject StateService StateService
+@inject EventService EventService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Kayıtlarım - EventEase</PageTitle>
+
+<div class="my-registrations-container">
+    <div class="page-header">
+        <h1><i class="bi bi-person-check"></i> Kayıtlarım</h1>
+        <p class="subtitle">Kayıt olduğunuz etkinlikleri buradan takip edebilirsiniz</p>
+    </div>
+
+    @if (StateService.CurrentSession != null && StateService.CurrentSession.IsAuthenticated)
+    {
+        <div class="user-info-card">
+            <div class="user-icon">
+                <i class="bi bi-person-circle"></i>
+            </div>
+            <div class="user-details">
+                <h3>@StateService.CurrentSession.FullName</h3>
+                <p><i class="bi bi-envelope"></i> @StateService.CurrentSession.Email</p>
+                <p><i class="bi bi-phone"></i> @StateService.CurrentSession.Phone</p>
+                @if (!string.IsNullOrWhiteSpace(StateService.CurrentSession.Company))
+                {
+                    <p><i class="bi bi-building"></i> @StateService.CurrentSession.Company</p>
+                }
+            </div>
+            <div class="user-stats">
+                <div class="stat">
+                    <div class="stat-number">@StateService.CurrentSession.TotalRegistrations</div>
+                    <div class="stat-label">Toplam Kayıt</div>
+                </div>
+            </div>
+        </div>
+
+        @if (userRegistrations.Any())
+        {
+            <div class="registrations-grid">
+                @foreach (var registration in userRegistrations)
+                {
+                    var eventItem = EventService.GetEventById(registration.EventId);
+                    if (eventItem != null)
+                    {
+                        <div class="registration-card">
+                            <div class="registration-header">
+                                <div class="event-info">
+                                    <h3>@eventItem.EventName</h3>
+                                    <span class="category-badge">@eventItem.Category</span>
+                                </div>
+                                <div class="status-icon">
+                                    @if (registration.IsCheckedIn)
+                                    {
+                                        <i class="bi bi-check-circle-fill checked-in"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-clock-fill pending"></i>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="registration-details">
+                                <div class="detail-item">
+                                    <i class="bi bi-hash"></i>
+                                    <span><strong>Referans:</strong> @registration.ReferenceNumber</span>
+                                </div>
+                                <div class="detail-item">
+                                    <i class="bi bi-calendar3"></i>
+                                    <span><strong>Etkinlik:</strong> @eventItem.EventDate.ToString("dd MMMM yyyy, HH:mm")</span>
+                                </div>
+                                <div class="detail-item">
+                                    <i class="bi bi-geo-alt"></i>
+                                    <span><strong>Konum:</strong> @eventItem.EventLocation</span>
+                                </div>
+                                <div class="detail-item">
+                                    <i class="bi bi-calendar-check"></i>
+                                    <span><strong>Kayıt Tarihi:</strong> @registration.RegisteredAt.ToString("dd MMMM yyyy, HH:mm")</span>
+                                </div>
+                                @if (registration.IsCheckedIn && registration.CheckedInAt.HasValue)
+                                {
+                                    <div class="detail-item success">
+                                        <i class="bi bi-check-circle"></i>
+                                        <span><strong>Check-in:</strong> @registration.CheckedInAt.Value.ToString("dd MMMM yyyy, HH:mm")</span>
+                                    </div>
+                                }
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(registration.SpecialRequests))
+                            {
+                                <div class="special-requests">
+                                    <strong><i class="bi bi-chat-left-text"></i> Özel İstekler:</strong>
+                                    <p>@registration.SpecialRequests</p>
+                                </div>
+                            }
+
+                            <div class="registration-actions">
+                                @if (!registration.IsCheckedIn)
+                                {
+                                    <span class="status-badge pending">
+                                        <i class="bi bi-clock"></i> Check-in Bekleniyor
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="status-badge checked-in">
+                                        <i class="bi bi-check-circle"></i> Katıldınız
+                                    </span>
+                                }
+                                <button class="btn-view-event" @onclick='() => Navigation.NavigateTo($"/event/{eventItem.Id}")'>
+                                    <i class="bi bi-eye"></i>
+                                    Etkinlik Detayı
+                                </button>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        }
+        else
+        {
+            <div class="no-registrations">
+                <i class="bi bi-calendar-x"></i>
+                <h3>Henüz kayıt bulunmuyor</h3>
+                <p>Etkinliklere kayıt olmak için ana sayfayı ziyaret edin</p>
+                <button class="btn-browse-events" @onclick='() => Navigation.NavigateTo("/")'>
+                    <i class="bi bi-calendar-event"></i>
+                    Etkinliklere Göz At
+                </button>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="not-logged-in">
+            <i class="bi bi-person-x"></i>
+            <h3>Oturum Bulunamadı</h3>
+            <p>Kayıtlarınızı görmek için bir etkinliğe kayıt olmanız gerekmektedir</p>
+            <button class="btn-browse-events" @onclick='() => Navigation.NavigateTo("/")'>
+                <i class="bi bi-calendar-event"></i>
+                Etkinliklere Göz At
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private List<EventEase.Models.Registration> userRegistrations = new();
+
+    protected override void OnInitialized()
+    {
+        LoadRegistrations();
+        StateService.OnChange += StateHasChanged;
+    }
+
+    private void LoadRegistrations()
+    {
+        try
+        {
+            userRegistrations = StateService.GetUserRegistrations();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading registrations: {ex.Message}");
+            userRegistrations = new List<EventEase.Models.Registration>();
+        }
+    }
+
+    public void Dispose()
+    {
+        StateService.OnChange -= StateHasChanged;
+    }
+}

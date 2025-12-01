@@ -1,0 +1,265 @@
+@page "/event/{eventId:int}"
+@using EventEase.Models
+@using EventEase.Services
+@using Microsoft.AspNetCore.Components.Web
+@inject EventService EventService
+@inject NavigationManager Navigation
+
+<PageTitle>@(eventItem?.EventName ?? "Event Details") - EventEase</PageTitle>
+
+<div class="event-details-container">
+    @if (eventItem != null)
+    {
+            <div class="breadcrumb">
+            <a href="/" class="breadcrumb-link">
+                <i class="bi bi-house"></i> Home
+            </a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">@eventItem.EventName</span>
+        </div>
+
+        <div class="event-details-content">
+            <div class="event-details-main">
+                <div class="event-hero-image">
+                    @if (!string.IsNullOrEmpty(eventItem.ImageUrl))
+                    {
+                        <img src="@eventItem.ImageUrl" alt="@eventItem.EventName" />
+                    }
+                    else
+                    {
+                        <div class="event-hero-placeholder">
+                            <i class="bi bi-calendar-event"></i>
+                        </div>
+                    }
+                </div>
+
+                <div class="event-info-section">
+                    <div class="event-header-detail">
+                        <h1 class="event-title-detail">@eventItem.EventName</h1>
+                        <span class="event-category-badge">@eventItem.Category</span>
+                    </div>
+
+                    <div class="event-meta-info">
+                        <div class="meta-item">
+                            <i class="bi bi-calendar3"></i>
+                            <div>
+                                <strong>Date & Time</strong>
+                                <p>@eventItem.EventDate.ToString("dd MMMM yyyy, dddd")</p>
+                                <p>@eventItem.EventDate.ToString("HH:mm")</p>
+                            </div>
+                        </div>
+
+                        <div class="meta-item">
+                            <i class="bi bi-geo-alt"></i>
+                            <div>
+                                <strong>Location</strong>
+                                <p>@eventItem.EventLocation</p>
+                            </div>
+                        </div>
+
+                        <div class="meta-item">
+                            <i class="bi bi-people"></i>
+                            <div>
+                                <strong>Attendance</strong>
+                                <p>@eventItem.CurrentAttendees / @eventItem.MaxAttendees</p>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: @GetAttendancePercentage()%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="event-description-section">
+                        <h2>About this event</h2>
+                        <p>@eventItem.Description</p>
+                    </div>
+
+                    <div class="event-additional-info">
+                        <h3>Important Information</h3>
+                        <ul>
+                            <li>Event duration: Approximately 3-4 hours</li>
+                            <li>Registration deadline: @eventItem.EventDate.AddDays(-2).ToString("dd MMMM yyyy")</li>
+                            <li>Cancellation policy: Free cancellation up to 48 hours before the event</li>
+                            <li>Dress code: @GetDressCode()</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+                    <div class="event-details-sidebar">
+                <div class="registration-card">
+                    <h3>Registration Info</h3>
+                    
+                    <div class="availability-status @GetAvailabilityStatusClass()">
+                        <i class="bi @GetAvailabilityIcon()"></i>
+                        <span>@GetAvailabilityMessage()</span>
+                    </div>
+
+                    @if (eventItem.IsRegistrationOpen)
+                    {
+                        <button class="btn-register" @onclick="NavigateToRegistration">
+                            <i class="bi bi-pencil-square"></i>
+                            Register
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="btn-register" disabled>
+                            <i class="bi bi-x-circle"></i>
+                            Registration Closed
+                        </button>
+                    }
+
+                    <button class="btn-attendance" @onclick='() => Navigation.NavigateTo($"/event/{EventId}/attendance")'>
+                        <i class="bi bi-clipboard-check"></i>
+                        Attendance Tracker
+                    </button>
+
+                    <div class="share-section">
+                        <h4>Share</h4>
+                        <div class="share-buttons">
+                            <button class="share-btn" title="Share on Twitter">
+                                <i class="bi bi-twitter"></i>
+                            </button>
+                            <button class="share-btn" title="Share on Facebook">
+                                <i class="bi bi-facebook"></i>
+                            </button>
+                            <button class="share-btn" title="Share on LinkedIn">
+                                <i class="bi bi-linkedin"></i>
+                            </button>
+                            <button class="share-btn" title="Copy Link">
+                                <i class="bi bi-link-45deg"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="organizer-card">
+                    <h3>Organizer</h3>
+                    <div class="organizer-info">
+                        <div class="organizer-logo">
+                            <i class="bi bi-building"></i>
+                        </div>
+                        <div>
+                            <strong>EventEase Turkey</strong>
+                            <p>Professional Event Management</p>
+                        </div>
+                    </div>
+                    <button class="btn-contact">
+                        <i class="bi bi-envelope"></i>
+                        Contact
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="not-found">
+            <i class="bi bi-exclamation-triangle"></i>
+            <h2>Event Not Found</h2>
+            <p>The event you are looking for might not exist or has been removed.</p>
+            <button class="btn-back-home" @onclick='() => Navigation.NavigateTo("/")'>
+                Back to Home
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int EventId { get; set; }
+
+    private Event? eventItem;
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            // Validate EventId before fetching
+            if (EventId <= 0)
+            {
+                eventItem = null;
+                return;
+            }
+            
+            eventItem = EventService.GetEventById(EventId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading event: {ex.Message}");
+            eventItem = null;
+        }
+    }
+
+    private void NavigateToRegistration()
+    {
+        if (eventItem != null && eventItem.IsRegistrationOpen)
+        {
+            Navigation.NavigateTo($"/event/{EventId}/register");
+        }
+    }
+
+    private int GetAttendancePercentage()
+    {
+        if (eventItem == null || eventItem.MaxAttendees <= 0) return 0;
+        
+        // Ensure percentage doesn't exceed 100
+        var percentage = (int)((double)eventItem.CurrentAttendees / eventItem.MaxAttendees * 100);
+        return Math.Min(100, Math.Max(0, percentage));
+    }
+
+    private string GetAvailabilityStatusClass()
+    {
+        if (eventItem == null || !eventItem.IsRegistrationOpen)
+            return "status-closed";
+
+        if (eventItem.MaxAttendees <= 0)
+            return "status-closed";
+            
+        var availableSeats = Math.Max(0, eventItem.MaxAttendees - eventItem.CurrentAttendees);
+        var percentage = (double)availableSeats / eventItem.MaxAttendees * 100;
+
+        return percentage switch
+        {
+            > 50 => "status-open",
+            > 20 => "status-limited",
+            _ => "status-almost-full"
+        };
+    }
+
+    private string GetAvailabilityIcon()
+    {
+        if (eventItem == null || !eventItem.IsRegistrationOpen)
+            return "bi-x-circle-fill";
+
+        var availableSeats = eventItem.MaxAttendees - eventItem.CurrentAttendees;
+        var percentage = (double)availableSeats / eventItem.MaxAttendees * 100;
+
+        return percentage > 50 ? "bi-check-circle-fill" : "bi-exclamation-circle-fill";
+    }
+
+    private string GetAvailabilityMessage()
+    {
+        if (eventItem == null) return "No information";
+        
+        if (!eventItem.IsRegistrationOpen)
+            return "Registration Closed";
+
+        var availableSeats = eventItem.MaxAttendees - eventItem.CurrentAttendees;
+        return availableSeats > 10 
+            ? $"{availableSeats} seats available" 
+            : $"Only {availableSeats} seats left!";
+    }
+
+    private string GetDressCode()
+    {
+        return eventItem?.Category switch
+        {
+            "Corporate" => "Business / Smart Casual",
+            "Social" => "Cocktail / Elegant",
+            "Educational" => "Casual",
+            _ => "Casual"
+        };
+    }
+}

@@ -1,0 +1,307 @@
+@page "/event/{eventId:int}/attendance"
+@using EventEase.Models
+@using EventEase.Services
+@inject EventService EventService
+@inject StateService StateService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Attendance Tracker - EventEase</PageTitle>
+
+<div class="attendance-container">
+    @if (eventItem != null)
+    {
+        <div class="attendance-header">
+            <div class="breadcrumb">
+                <a href="/" class="breadcrumb-link">
+                    <i class="bi bi-house"></i> Home
+                </a>
+                <span class="breadcrumb-separator">/</span>
+                <a href="/event/@EventId" class="breadcrumb-link">
+                    @eventItem.EventName
+                </a>
+                <span class="breadcrumb-separator">/</span>
+                <span class="breadcrumb-current">Attendance Tracker</span>
+            </div>
+
+            <h1>Attendance Tracker</h1>
+            <h2 class="event-name">@eventItem.EventName</h2>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card total">
+                <div class="stat-icon">
+                    <i class="bi bi-people-fill"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value">@stats.Total</div>
+                    <div class="stat-label">Total Registrations</div>
+                </div>
+            </div>
+
+            <div class="stat-card checked-in">
+                <div class="stat-icon">
+                    <i class="bi bi-check-circle-fill"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value">@stats.CheckedIn</div>
+                    <div class="stat-label">Checked In</div>
+                </div>
+            </div>
+
+            <div class="stat-card pending">
+                <div class="stat-icon">
+                    <i class="bi bi-clock-fill"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value">@stats.Pending</div>
+                    <div class="stat-label">Pending</div>
+                </div>
+            </div>
+
+            <div class="stat-card percentage">
+                <div class="stat-icon">
+                    <i class="bi bi-graph-up"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value">@GetAttendancePercentage()%</div>
+                    <div class="stat-label">Attendance Rate</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="check-in-section">
+            <h3><i class="bi bi-qr-code"></i> Quick Check-in</h3>
+            <div class="check-in-form">
+                <input type="text" 
+                       @bind="referenceNumber" 
+                       placeholder="Enter reference number (e.g. EE-20241201-12345)"
+                       class="reference-input" />
+                <button class="btn-check-in" @onclick="CheckIn">
+                    <i class="bi bi-check-circle"></i>
+                    Check In
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(checkInMessage))
+            {
+                <div class="check-in-message @checkInMessageClass">
+                    <i class="bi @(checkInSuccess ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill")"></i>
+                    @checkInMessage
+                </div>
+            }
+        </div>
+
+        <div class="registrations-section">
+            <div class="section-header">
+                <h3><i class="bi bi-list-ul"></i> Registered Participants</h3>
+                <div class="filter-tabs">
+                    <button class="filter-tab @(filterStatus == "all" ? "active" : "")" 
+                            @onclick='() => filterStatus = "all"'>
+                        All (@stats.Total)
+                    </button>
+                    <button class="filter-tab @(filterStatus == "checked-in" ? "active" : "")" 
+                            @onclick='() => filterStatus = "checked-in"'>
+                        Checked In (@stats.CheckedIn)
+                    </button>
+                    <button class="filter-tab @(filterStatus == "pending" ? "active" : "")" 
+                            @onclick='() => filterStatus = "pending"'>
+                        Pending (@stats.Pending)
+                    </button>
+                </div>
+            </div>
+
+            @if (FilteredRegistrations.Any())
+            {
+                <div class="registrations-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Ref. No</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Company</th>
+                                <th>Registered At</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var registration in FilteredRegistrations)
+                            {
+                                <tr class="@(registration.IsCheckedIn ? "checked-in" : "")">
+                                    <td><strong>@registration.ReferenceNumber</strong></td>
+                                    <td>@registration.FullName</td>
+                                    <td>@registration.Email</td>
+                                    <td>@(string.IsNullOrWhiteSpace(registration.Company) ? "-" : registration.Company)</td>
+                                    <td>@registration.RegisteredAt.ToString("dd.MM.yyyy HH:mm")</td>
+                                    <td>
+                                        @if (registration.IsCheckedIn)
+                                        {
+                                            <span class="status-badge checked-in">
+                                                <i class="bi bi-check-circle-fill"></i>
+                                                Checked In - @registration.CheckedInAt?.ToString("HH:mm")
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="status-badge pending">
+                                                <i class="bi bi-clock-fill"></i>
+                                                Waiting
+                                            </span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!registration.IsCheckedIn)
+                                        {
+                                            <button class="btn-action" 
+                                                    @onclick="() => CheckInByReference(registration.ReferenceNumber)">
+                                                <i class="bi bi-check2"></i>
+                                                Check In
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="no-registrations">
+                    <i class="bi bi-inbox"></i>
+                    <p>@GetNoRegistrationsMessage()</p>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="error-message">
+            <i class="bi bi-exclamation-triangle"></i>
+            <h2>Event Not Found</h2>
+            <button class="btn-back" @onclick='() => Navigation.NavigateTo("/")'>
+                Back to Home
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int EventId { get; set; }
+
+    private Event? eventItem;
+    private List<EventEase.Models.Registration> registrations = new();
+    private (int Total, int CheckedIn, int Pending) stats;
+    private string referenceNumber = string.Empty;
+    private string checkInMessage = string.Empty;
+    private string checkInMessageClass = string.Empty;
+    private bool checkInSuccess = false;
+    private string filterStatus = "all";
+
+    private IEnumerable<EventEase.Models.Registration> FilteredRegistrations
+    {
+        get
+        {
+            return filterStatus switch
+            {
+                "checked-in" => registrations.Where(r => r.IsCheckedIn),
+                "pending" => registrations.Where(r => !r.IsCheckedIn),
+                _ => registrations
+            };
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            eventItem = EventService.GetEventById(EventId);
+            LoadData();
+            StateService.OnChange += StateHasChanged;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing attendance tracker: {ex.Message}");
+        }
+    }
+
+    private void LoadData()
+    {
+        try
+        {
+            registrations = StateService.GetEventRegistrations(EventId);
+            stats = StateService.GetAttendanceStats(EventId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading data: {ex.Message}");
+        }
+    }
+
+    private void CheckIn()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(referenceNumber))
+            {
+                ShowMessage("Please enter a reference number", false);
+                return;
+            }
+
+            var success = StateService.CheckInRegistration(referenceNumber);
+            
+            if (success)
+            {
+                ShowMessage($"✓ Registration {referenceNumber} checked in successfully!", true);
+                referenceNumber = string.Empty;
+                LoadData();
+            }
+            else
+            {
+                ShowMessage("Registration not found or already checked in", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error during check-in: {ex.Message}");
+            ShowMessage("An error occurred during check-in", false);
+        }
+    }
+
+    private void CheckInByReference(string refNumber)
+    {
+        referenceNumber = refNumber;
+        CheckIn();
+    }
+
+    private void ShowMessage(string message, bool success)
+    {
+        checkInMessage = message;
+        checkInSuccess = success;
+        checkInMessageClass = success ? "success" : "error";
+    }
+
+    private int GetAttendancePercentage()
+    {
+        if (stats.Total == 0) return 0;
+        return (int)((double)stats.CheckedIn / stats.Total * 100);
+    }
+
+    private string GetNoRegistrationsMessage()
+    {
+        return filterStatus switch
+        {
+            "checked-in" => "No one has checked in yet",
+            "pending" => "All participants have checked in",
+            _ => "There are no registrations for this event yet"
+        };
+    }
+
+    public void Dispose()
+    {
+        StateService.OnChange -= StateHasChanged;
+    }
+}

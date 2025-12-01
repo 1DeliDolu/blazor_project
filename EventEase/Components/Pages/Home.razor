@@ -1,0 +1,140 @@
+﻿@page "/"
+@using EventEase.Models
+@using EventEase.Services
+@inject EventService EventService
+@inject NavigationManager Navigation
+
+<PageTitle>EventEase - Event List</PageTitle>
+
+<div class="events-container">
+    <div class="events-header">
+        <h1>Upcoming Events</h1>
+        <p class="events-subtitle">Discover the best corporate and social events</p>
+    </div>
+
+    <div class="filter-section">
+        <div class="search-box">
+            <i class="bi bi-search"></i>
+            <input type="text" 
+                   placeholder="Search events..." 
+                   @bind="searchTerm" 
+                   @bind:event="oninput"
+                   class="search-input" />
+        </div>
+        
+        <div class="filter-buttons">
+            <button class="filter-btn @(selectedCategory == "All" ? "active" : "")" 
+                    @onclick='() => selectedCategory = "All"'>
+                All
+            </button>
+            <button class="filter-btn @(selectedCategory == "Corporate" ? "active" : "")" 
+                    @onclick='() => selectedCategory = "Corporate"'>
+                Corporate
+            </button>
+            <button class="filter-btn @(selectedCategory == "Social" ? "active" : "")" 
+                    @onclick='() => selectedCategory = "Social"'>
+                Social
+            </button>
+            <button class="filter-btn @(selectedCategory == "Educational" ? "active" : "")" 
+                    @onclick='() => selectedCategory = "Educational"'>
+                Educational
+            </button>
+        </div>
+    </div>
+
+    <div class="events-grid">
+        @foreach (var eventItem in FilteredEvents)
+        {
+            <EventCard EventItem="eventItem" 
+                      OnViewDetailsClicked="HandleViewDetails" />
+        }
+    </div>
+
+    @if (!FilteredEvents.Any())
+    {
+        <div class="no-results">
+            <i class="bi bi-calendar-x"></i>
+            <h3>No Events Found</h3>
+            <p>No events match your search criteria.</p>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Event> events = new();
+    private string searchTerm = string.Empty;
+    private string selectedCategory = "All";
+    
+    // Cache filtered results to improve performance
+    private IEnumerable<Event>? _cachedFilteredEvents;
+    private string _lastSearchTerm = string.Empty;
+    private string _lastSelectedCategory = "All";
+
+    private IEnumerable<Event> FilteredEvents
+    {
+        get
+        {
+            // Performance optimization: Return cached results if filters haven't changed
+            if (_cachedFilteredEvents != null && 
+                _lastSearchTerm == searchTerm && 
+                _lastSelectedCategory == selectedCategory)
+            {
+                return _cachedFilteredEvents;
+            }
+            
+            var filtered = events.AsEnumerable();
+
+            // Category filter - optimized with early return
+            if (selectedCategory != "All")
+            {
+                filtered = filtered.Where(e => e.Category == selectedCategory);
+            }
+
+            // Search filter - optimized with null/whitespace check
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var searchLower = searchTerm.ToLowerInvariant(); // Single conversion
+                filtered = filtered.Where(e =>
+                    e.EventName.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ||
+                    e.EventLocation.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ||
+                    e.Description.Contains(searchLower, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Cache the results
+            _cachedFilteredEvents = filtered.OrderBy(e => e.EventDate).ToList();
+            _lastSearchTerm = searchTerm;
+            _lastSelectedCategory = selectedCategory;
+            
+            return _cachedFilteredEvents;
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            events = EventService.GetAllEvents() ?? new List<Event>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading events: {ex.Message}");
+            events = new List<Event>();
+        }
+    }
+
+    private void HandleViewDetails(int eventId)
+    {
+        try
+        {
+            // Validate eventId before navigation
+            if (eventId > 0)
+            {
+                Navigation.NavigateTo($"/event/{eventId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Navigation error: {ex.Message}");
+        }
+    }
+}
